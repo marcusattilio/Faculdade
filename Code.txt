@@ -1,0 +1,145 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+// Definindo a estrutura do produto
+typedef struct {
+    int id;
+    char nome[50];
+    float preco;
+} Produto;
+
+// Função para abrir a conexão com o banco de dados
+MYSQL* conectar_banco() {
+    MYSQL *conn = mysql_init(NULL);
+
+    if (conn == NULL) {
+        fprintf(stderr, "mysql_init() falhou\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (mysql_real_connect(conn, "localhost", "seu_usuario", "sua_senha", "hortifruti", 0, NULL, 0) == NULL) {
+        fprintf(stderr, "mysql_real_connect() falhou\n");
+        mysql_close(conn);
+        exit(EXIT_FAILURE);
+    }
+
+    return conn;
+}
+
+// Função para adicionar um produto ao banco de dados
+void adicionarProduto(MYSQL *conn) {
+    Produto produto;
+    printf("Digite o ID do produto: ");
+    scanf("%d", &produto.id);
+    printf("Digite o nome do produto: ");
+    scanf("%s", produto.nome);
+    printf("Digite o preço do produto: ");
+    scanf("%f", &produto.preco);
+
+    char query[256];
+    snprintf(query, sizeof(query), "INSERT INTO produtos (id, nome, preco) VALUES (%d, '%s', %.2f)", produto.id, produto.nome, produto.preco);
+
+    if (mysql_query(conn, query)) {
+        fprintf(stderr, "Falha ao adicionar produto: %s\n", mysql_error(conn));
+    } else {
+        printf("Produto adicionado com sucesso.\n");
+    }
+}
+
+// Função para listar os produtos do banco de dados
+void listarProdutos(MYSQL *conn) {
+    if (mysql_query(conn, "SELECT * FROM produtos")) {
+        fprintf(stderr, "Falha ao listar produtos: %s\n", mysql_error(conn));
+        return;
+    }
+
+    MYSQL_RES *res = mysql_store_result(conn);
+
+    if (res == NULL) {
+        fprintf(stderr, "mysql_store_result() falhou: %s\n", mysql_error(conn));
+        return;
+    }
+
+    int num_fields = mysql_num_fields(res);
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        for(int i = 0; i < num_fields; i++) {
+            printf("%s ", row[i] ? row[i] : "NULL");
+        }
+        printf("\n");
+    }
+
+    mysql_free_result(res);
+}
+
+// Função para consultar um produto pelo ID no banco de dados
+void consultarProduto(MYSQL *conn) {
+    int id;
+    printf("Digite o ID do produto a consultar: ");
+    scanf("%d", &id);
+
+    char query[256];
+    snprintf(query, sizeof(query), "SELECT * FROM produtos WHERE id = %d", id);
+
+    if (mysql_query(conn, query)) {
+        fprintf(stderr, "Falha ao consultar produto: %s\n", mysql_error(conn));
+        return;
+    }
+
+    MYSQL_RES *res = mysql_store_result(conn);
+
+    if (res == NULL) {
+        fprintf(stderr, "mysql_store_result() falhou: %s\n", mysql_error(conn));
+        return;
+    }
+
+    MYSQL_ROW row = mysql_fetch_row(res);
+
+    if (row) {
+        printf("Produto encontrado:\n");
+        printf("ID: %s\n", row[0]);
+        printf("Nome: %s\n", row[1]);
+        printf("Preço: %s\n", row[2]);
+    } else {
+        printf("Produto não encontrado.\n");
+    }
+
+    mysql_free_result(res);
+}
+
+int main() {
+    MYSQL *conn = conectar_banco();
+    int opcao;
+
+    do {
+        printf("1. Adicionar Produto\n");
+        printf("2. Listar Produtos\n");
+        printf("3. Consultar Produto\n");
+        printf("4. Sair\n");
+        printf("Escolha uma opção: ");
+        scanf("%d", &opcao);
+
+        switch(opcao) {
+            case 1:
+                adicionarProduto(conn);
+                break;
+            case 2:
+                listarProdutos(conn);
+                break;
+            case 3:
+                consultarProduto(conn);
+                break;
+            case 4:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opção inválida.\n");
+        }
+    } while(opcao != 4);
+
+    mysql_close(conn);
+    return 0;
+}
